@@ -1,42 +1,34 @@
 # MewCode
 
-MewCode 是一个基于 Python 的终端 AI 编程助手。它提供交互式 TUI、一次性命令执行、文件读写、代码搜索、Shell 执行、权限控制、会话管理、记忆、Skills、MCP 工具接入、子代理和团队协作等能力，适合在本地代码仓库中辅助阅读、修改、测试和维护代码。
+MewCode 是一个基于 Python 的终端 AI 编程助手，面向本地代码仓库的阅读、修改、验证和协作开发场景。它提供交互式 TUI、非交互式命令执行、文件工具、Shell 工具、权限控制、会话管理、记忆、Skills、MCP、子 Agent、团队协作和 Git worktree 支持。
 
-## 主要功能
+## 特性概览
 
-- 终端交互界面：基于 Textual 构建，可在终端中进行连续对话和代码操作。
-- 非交互模式：通过 `mewcode -p "..."` 执行一次性任务并把结果输出到标准输出。
-- 多模型接入：支持 `anthropic`、`openai` 和 `openai-compat` 协议。
-- 本地工具：内置文件读取、文件写入、文件编辑、内容搜索、路径匹配和 Shell 执行工具。
-- 权限系统：支持多种权限模式，并可通过规则文件控制命令和文件访问行为。
-- MCP 支持：可以通过 stdio 或 URL 接入外部 MCP Server，并自动注册 MCP 工具。
-- Skills 机制：支持内置 Skills，也支持项目级和用户级 Skills 扩展。
-- 子代理与团队协作：支持后台子代理、任务管理、消息通信、trace 跟踪和 team 模式。
-- Worktree 支持：可以为任务创建隔离工作区，并复用指定目录的软链接。
-- 会话与记忆：支持会话保存、压缩、回退、项目说明加载和记忆文件。
+- **终端交互**：基于 Textual 构建，支持连续对话、流式输出和斜杠命令。
+- **一次性执行**：通过 `mewcode -p "..."` 在脚本或 CI 类场景中执行单次任务。
+- **多 Provider 支持**：支持 `anthropic`、`openai` 和 `openai-compat` 协议。
+- **内置代码工具**：提供文件读取、写入、编辑、搜索、路径匹配和 Shell 执行能力。
+- **权限与沙箱**：结合权限模式、危险命令检测、路径规则和本地规则文件控制工具调用。
+- **Skills 扩展**：通过 `SKILL.md` 描述可复用工作流，让 Agent 在特定任务中具备稳定操作策略。
+- **MCP 集成**：支持 stdio 和 URL 形式的 MCP Server，并将外部能力注册为工具。
+- **子 Agent 与团队协作**：支持后台任务、子 Agent、团队成员、消息通信和任务跟踪。
+- **Worktree 隔离**：可为复杂任务创建隔离工作区，降低改动互相干扰的风险。
+- **会话与记忆**：支持会话保存、恢复、压缩、项目说明和长期记忆。
 
 ## 环境要求
 
 - Python `>= 3.11`
-- 推荐使用虚拟环境或 Conda 环境
+- 推荐使用虚拟环境、Conda 或 `uv`
 - 至少配置一个可用的大模型 Provider
 
-项目依赖见 [pyproject.toml](./pyproject.toml)，主要包括：
-
-- `textual`
-- `anthropic`
-- `openai`
-- `pyyaml`
-- `pydantic`
-- `mcp`
-- `httpx`
+核心依赖见 [pyproject.toml](./pyproject.toml)，包括 `textual`、`anthropic`、`openai`、`pyyaml`、`pydantic`、`mcp` 和 `httpx`。
 
 ## 安装
 
 进入项目目录：
 
 ```powershell
-cd E:\Agent_learning\mewcode-python
+cd path\to\mewcode
 ```
 
 创建并激活虚拟环境：
@@ -52,7 +44,7 @@ python -m venv .venv
 pip install -e .
 ```
 
-如果使用 `uv`：
+使用 `uv` 时可以执行：
 
 ```powershell
 uv sync
@@ -60,13 +52,13 @@ uv sync
 
 ## 配置
 
-MewCode 启动时会按顺序读取配置：
+MewCode 会按顺序读取以下配置文件：
 
 1. `~/.mewcode/config.yaml`
 2. 当前项目下的 `.mewcode/config.yaml`
 3. 当前项目下的 `.mewcode/config.local.yaml`
 
-后面的项目级配置可以覆盖或补充前面的用户级配置。`config.yaml` 通常不应该提交到 Git，因为其中可能包含 API Key。本仓库已在 `.gitignore` 中忽略 `config.yaml` 和 `.mewcode/`。
+后加载的项目级配置会补充或覆盖用户级配置。包含 API Key、本地路径或临时设置的配置文件不应提交到仓库。
 
 ### OpenAI 示例
 
@@ -105,7 +97,7 @@ providers:
     api_key: ${OPENAI_API_KEY}
 ```
 
-### 常用配置字段
+### 常用配置项
 
 ```yaml
 permission_mode: default
@@ -123,7 +115,7 @@ worktree:
   stale_cutoff_hours: 24
 ```
 
-`permission_mode` 可选值：
+`permission_mode` 支持：
 
 - `default`
 - `acceptEdits`
@@ -140,7 +132,7 @@ worktree:
 mewcode
 ```
 
-或直接使用模块方式运行：
+模块方式启动：
 
 ```powershell
 python -m mewcode
@@ -158,76 +150,76 @@ mewcode --mode plan
 mewcode -p "阅读这个项目并总结主要模块"
 ```
 
-在不使用终端 alternate screen 的情况下运行：
+保留终端 scrollback，不进入 alternate screen：
 
 ```powershell
 $env:MEWCODE_NO_ALT_SCREEN = "1"
 mewcode
 ```
 
-## MCP 配置
+## MCP 示例
 
-仓库中提供了一个本地 MCP 配置示例：[examples/mcp-local-config.yaml](./examples/mcp-local-config.yaml)。
+仓库提供本地 MCP 配置示例：[examples/mcp-local-config.yaml](./examples/mcp-local-config.yaml)。
 
-可将其中的 `mcp_servers` 配置合并到 `.mewcode/config.yaml`：
+可将其中的 `mcp_servers` 合并到 `.mewcode/config.yaml`：
 
 ```yaml
 mcp_servers:
   local:
-    command: D:\anconda\envs\MewCode\python.exe
+    command: python
     args:
       - -m
       - mewcode.mcp.local_server
       - --root
-      - E:\Agent_learning\mewcode-python
+      - <project-root>
     env:
-      MEWCODE_MCP_ROOT: E:\Agent_learning\mewcode-python
+      MEWCODE_MCP_ROOT: <project-root>
 ```
 
-本地 MCP Server 入口：
+手动启动本地 MCP Server：
 
 ```powershell
-python -m mewcode.mcp.local_server --root E:\Agent_learning\mewcode-python
+python -m mewcode.mcp.local_server --root path\to\project
 ```
 
-## 项目结构
+## 目录结构
 
 ```text
-mewcode-python/
-├── mewcode/                    # 主包
-│   ├── __main__.py             # CLI 入口
-│   ├── app.py                  # Textual 交互式应用
-│   ├── agent.py                # Agent 主循环与工具调用流程
-│   ├── client.py               # 大模型客户端适配
-│   ├── config.py               # 配置加载与合并
-│   ├── validator.py            # 配置校验
-│   ├── commands/               # 斜杠命令
-│   ├── tools/                  # 内置工具
-│   ├── permissions/            # 权限检查、规则和沙箱
-│   ├── mcp/                    # MCP 客户端和本地 MCP Server
-│   ├── skills/                 # Skills 解析、加载和执行
-│   ├── agents/                 # 子代理定义、加载、trace 和任务管理
-│   ├── teams/                  # 团队协作、消息和共享任务
-│   ├── worktree/               # Git worktree 管理
-│   ├── memory/                 # 记忆、会话和项目说明
-│   ├── hooks/                  # 生命周期 Hook
-│   └── context/                # 上下文管理
-├── tests/                      # 测试用例
-├── examples/                   # 示例配置
-├── pyproject.toml              # 项目元数据和依赖
-├── uv.lock                     # uv 锁文件
-└── MEWCODE.md                  # 项目内给助手读取的开发说明
+mewcode/
+|-- mewcode/                  # 主包
+|   |-- __main__.py           # CLI 入口
+|   |-- app.py                # Textual 交互应用
+|   |-- agent.py              # Agent 主循环与工具调用
+|   |-- client.py             # 模型客户端适配
+|   |-- config.py             # 配置加载与合并
+|   |-- validator.py          # 配置校验
+|   |-- commands/             # 斜杠命令
+|   |-- tools/                # 内置工具
+|   |-- permissions/          # 权限、规则和沙箱
+|   |-- mcp/                  # MCP 客户端和本地 Server
+|   |-- skills/               # Skills 解析、加载和执行
+|   |-- agents/               # 子 Agent 定义、加载和跟踪
+|   |-- teams/                # 团队协作、消息和共享任务
+|   |-- worktree/             # Git worktree 管理
+|   |-- memory/               # 记忆、会话和项目说明
+|   |-- hooks/                # 生命周期 Hook
+|   `-- context/              # 上下文管理
+|-- tests/                    # 测试用例
+|-- examples/                 # 示例配置
+|-- pyproject.toml            # 项目元数据和依赖
+|-- uv.lock                   # uv 锁文件
+`-- MEWCODE.md                # 项目级开发说明
 ```
 
 ## 内置命令
 
-交互式界面中可以使用斜杠命令。常见命令包括：
+交互式界面中可使用斜杠命令：
 
 - `/help`：查看可用命令。
 - `/clear`：清空当前对话显示或上下文。
 - `/compact`：压缩当前会话上下文。
 - `/do`：执行指定操作。
-- `/mcp`：查看 MCP 相关状态。
+- `/mcp`：查看 MCP 状态。
 - `/memory`：查看或管理记忆。
 - `/permission`：查看或调整权限模式。
 - `/plan`：进入计划模式。
@@ -237,14 +229,14 @@ mewcode-python/
 - `/skill`：查看或加载 Skills。
 - `/status`：查看当前状态。
 - `/tasks`：查看后台任务。
-- `/trace`：查看子代理或团队任务轨迹。
+- `/trace`：查看子 Agent 或团队任务轨迹。
 - `/worktree`：管理任务工作区。
 
 实际可用命令以运行时 `/help` 输出为准。
 
 ## 内置工具
 
-默认注册的基础工具：
+默认基础工具：
 
 - `ReadFile`：读取文件并返回带行号内容。
 - `WriteFile`：写入文件。
@@ -253,39 +245,31 @@ mewcode-python/
 - `Glob`：按 glob 模式查找路径。
 - `Grep`：按正则搜索文件内容。
 
-在不同配置下还会注册：
+按配置或上下文额外注册的工具包括 `ToolSearch`、`Agent`、`TeamCreate`、`TeamDelete`、`TaskCreate`、`TaskGet`、`TaskList`、`TaskUpdate`、`SendMessage`、`LoadSkill`、`EnterWorktree`、`ExitWorktree` 以及 MCP 工具。
 
-- `ToolSearch`：搜索延迟加载工具。
-- `Agent`：启动子代理。
-- `TeamCreate` / `TeamDelete`：创建或删除团队。
-- `TaskCreate` / `TaskGet` / `TaskList` / `TaskUpdate`：团队任务管理。
-- `SendMessage`：团队成员消息通信。
-- `LoadSkill`：加载 Skill。
-- `EnterWorktree` / `ExitWorktree`：进入或退出任务 worktree。
-- MCP 工具：按 `mcp__<server>__<tool>` 形式注册。
+## Skills 与 Agents
 
-## Skills
-
-MewCode 会加载内置 Skills，并支持项目级和用户级 Skills：
-
-- 项目级：`.mewcode/skills`
-- 用户级：`~/.mewcode/skills`
-
-Skill 通常包含 `SKILL.md`，用于描述触发条件、操作流程和可选工具。项目中已有内置示例位于：
+Skills 用于封装可复用工作流，内置 Skills 位于：
 
 ```text
 mewcode/skills/builtins/
 ```
 
-## Agents 与团队协作
+项目级和用户级扩展目录：
 
-项目支持内置子代理，也支持自定义代理：
+- `.mewcode/skills`
+- `~/.mewcode/skills`
 
-- 项目级代理：`.mewcode/agents`
-- 用户级代理：`~/.mewcode/agents`
-- 内置代理：`mewcode/agents/builtins`
+Agents 用于定义可复用子 Agent，内置 Agents 位于：
 
-启用 `enable_fork` 后，Agent 工具可以派生后台子代理。启用 `teammate_mode: in-process` 后，可以创建同进程团队成员，并通过共享任务和消息机制协作。
+```text
+mewcode/agents/builtins/
+```
+
+项目级和用户级扩展目录：
+
+- `.mewcode/agents`
+- `~/.mewcode/agents`
 
 ## 权限与安全
 
@@ -295,11 +279,11 @@ mewcode/skills/builtins/
 - 项目级：`.mewcode/permissions.yaml`
 - 本地覆盖：`.mewcode/permissions.local.yaml`
 
-权限系统会结合当前 `permission_mode`、危险命令检测、路径沙箱和规则文件判断工具调用是否允许。建议不要把本地覆盖规则和包含敏感信息的配置提交到仓库。
+权限系统会综合 `permission_mode`、危险命令检测、路径沙箱和规则文件判断工具调用是否允许。不要提交本地覆盖规则、API Key、会话文件、缓存或包含敏感信息的配置。
 
-## 会话、记忆和项目说明
+## 运行时数据
 
-运行时会在 `.mewcode/` 下保存会话、日志和临时状态，例如：
+运行时状态默认位于 `.mewcode/`，常见内容包括：
 
 - `.mewcode/debug.log`
 - `.mewcode/sessions/`
@@ -307,28 +291,17 @@ mewcode/skills/builtins/
 - `.mewcode/memories.md`
 - `.mewcode/memory/`
 
-项目说明文件可放在：
-
-- 当前项目：`.mewcode/MEWCODE.md`
-- 用户目录：`~/.mewcode/MEWCODE.md`
-
-仓库根目录的 [MEWCODE.md](./MEWCODE.md) 是给开发者和助手阅读的项目说明。
+这些内容通常属于本地运行状态，不应提交到远端仓库。
 
 ## 测试
 
 运行全部测试：
 
 ```powershell
-pytest
-```
-
-或：
-
-```powershell
 python -m pytest
 ```
 
-运行单个测试文件：
+运行指定测试文件：
 
 ```powershell
 python -m pytest tests/test_agent.py
@@ -339,34 +312,7 @@ python -m pytest tests/test_agent.py
 - 修改 CLI 行为时优先查看 `mewcode/__main__.py`。
 - 修改交互界面时优先查看 `mewcode/app.py`。
 - 修改 Agent 执行流程时优先查看 `mewcode/agent.py`。
-- 新增工具时参考 `mewcode/tools/` 下已有工具，并在注册逻辑中加入。
+- 新增工具时参考 `mewcode/tools/`，并检查工具注册和权限影响。
 - 新增命令时参考 `mewcode/commands/handlers/`。
 - 修改配置字段时同步更新 `mewcode/config.py` 和 `mewcode/validator.py`。
-- 涉及权限、文件写入、Shell 执行的改动应补充测试。
-
-## Git 忽略说明
-
-当前 `.gitignore` 会忽略以下常见本地文件：
-
-- `config.yaml`
-- `.mewcode/`
-- `.venv/`
-- `.venvs/`
-- `.pytest_cache/`
-- `.tmp/`
-- `.uv-cache/`
-- `__pycache__/`
-- `*.pyc`
-- `.idea/`
-- `.vscode/`
-- 构建产物目录
-
-这样可以避免把 API Key、本地会话、缓存、虚拟环境和 IDE 配置提交到远端。
-
-## 当前状态
-
-该项目已推送到 GitHub 仓库：
-
-```text
-https://github.com/liyoubo954/agent
-```
+- 涉及权限、文件写入、Shell 执行、上下文压缩或会话恢复的改动应补充测试。
