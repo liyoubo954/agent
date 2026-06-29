@@ -1,6 +1,6 @@
 ---
 name: commit
-description: 分析 git diff 并生成规范的 commit
+description: Create a clean Git commit from current repository changes. Use when the user asks to commit, prepare a commit message, stage changes, summarize diffs for commit, or make a safe checkpoint. Inspects git status and diffs, avoids secrets and unrelated files, stages only relevant paths, and writes a conventional, reviewable commit message.
 allowedTools:
   - Bash
   - ReadFile
@@ -8,32 +8,42 @@ allowedTools:
 mode: inline
 ---
 
-# 任务
+# Commit Assistant
 
-你需要帮助用户创建一个清晰、可审查的 Git commit。
+Create one focused, reviewable commit that matches the user's intent and the actual diff.
 
-## 步骤
+## Workflow
 
-1. 运行 `git status` 查看当前变更状态。
-2. 运行 `git diff` 和 `git diff --staged` 查看具体变更内容。
-3. 分析变更，确定 commit 类型和范围：
-   - `feat`：新功能。
-   - `fix`：修复 bug。
-   - `docs`：文档变更。
-   - `refactor`：重构。
-   - `test`：测试。
-   - `chore`：构建、工具或维护变更。
-4. 生成 commit message，格式为 `type(scope): description`。
-5. 逐个添加相关文件，不要添加 `.env`、credentials、密钥、缓存或本地配置文件。
-6. 执行 `git commit -m "生成的 message"`。
-7. 如果用户提供了额外说明，将其纳入 commit message。
-8. 如果变更覆盖超过 10 个文件，建议拆分为多个 commit，除非用户明确要求一次提交。
+1. Inspect repository state.
+   - Run `git status --short --branch`.
+   - Run `git diff --stat`, `git diff`, and `git diff --staged` as needed.
+2. Decide commit scope.
+   - Include only files relevant to the user's requested change.
+   - Leave unrelated local changes untouched.
+   - Do not stage secrets, credentials, local config, cache files, virtual environments, or generated noise.
+3. Choose the commit type.
+   - `feat`: user-facing or developer-facing feature.
+   - `fix`: bug fix.
+   - `docs`: documentation-only change.
+   - `test`: tests only.
+   - `refactor`: behavior-preserving code restructuring.
+   - `chore`: maintenance, tooling, metadata, or dependency housekeeping.
+4. Write the message.
+   - Prefer `type(scope): summary`.
+   - Use English.
+   - Keep the summary under 72 characters.
+   - Add a body only when the reason or risk is not obvious from the diff.
+5. Stage deliberately.
+   - Prefer explicit file paths.
+   - Use broad staging only when the diff has been reviewed and is clearly scoped.
+6. Commit and report the result.
+   - Include the commit hash and message.
+   - Mention any uncommitted files left intentionally.
 
-## 注意事项
+## Safety Checks
 
-- 不要默认使用 `git add -A` 或 `git add .`，优先逐个添加相关文件。
-- commit message 使用英文。
-- description 不超过 72 个字符。
-- 提交前确认工作区中没有误加入敏感文件。
+- Stop and report if the diff contains obvious secrets or private local paths.
+- Stop and ask if the repository has conflicting changes that make the intended commit ambiguous.
+- Do not amend, rebase, reset, force-push, or rewrite history unless the user explicitly asks.
 
 $ARGUMENTS

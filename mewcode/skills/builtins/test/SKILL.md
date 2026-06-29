@@ -1,6 +1,6 @@
 ---
 name: test
-description: 运行项目测试并分析结果
+description: Run and interpret a project's test suite. Use when the user asks to test, verify, validate, run checks, reproduce a failure, diagnose failing tests, or assess whether recent code changes are safe. Supports Python, Go, Node.js, Rust, and mixed repositories by detecting project files and selecting the most appropriate test command.
 allowedTools:
   - Bash
   - ReadFile
@@ -9,29 +9,49 @@ allowedTools:
 mode: inline
 ---
 
-# 任务
+# Test Runner
 
-你需要运行项目的测试套件并分析结果。
+Run the smallest reliable validation that answers the user's request, then explain the result with enough evidence for the user to act.
 
-## 步骤
+## Workflow
 
-1. 检测项目类型，按优先级查找：
-   - `pyproject.toml` 或 `setup.py`：Python 项目，优先使用 `python -m pytest`
-   - `go.mod`：Go 项目，使用 `go test ./...`
-   - `package.json`：Node.js 项目，使用 `npm test`
-   - `Cargo.toml`：Rust 项目，使用 `cargo test`
-2. 运行对应测试命令，捕获完整输出。
-3. 分析测试结果：
-   - 如果全部通过，报告通过数量和覆盖率信息，如果可用。
-   - 如果存在失败，区分代码问题和测试问题。
-4. 对每个失败测试说明：
-   - 失败位置，包括文件名和测试名。
-   - 失败类型，是代码 bug、测试 bug 还是环境问题。
-   - 具体修复建议。
-5. 如果全部通过，检查是否存在明显缺失的测试场景：
-   - 边界值。
-   - 错误路径。
-   - 空输入。
-   - 极端值。
+1. Identify the project type and test entrypoints.
+   - Python: `pyproject.toml`, `setup.py`, `pytest.ini`, `tox.ini`; prefer `python -m pytest`.
+   - Go: `go.mod`; prefer `go test ./...`.
+   - Node.js: `package.json`; inspect scripts and prefer the declared test script.
+   - Rust: `Cargo.toml`; prefer `cargo test`.
+   - Mixed repo: run only the relevant suite unless the user asks for full validation.
+2. Check existing instructions before inventing commands.
+   - Read README, project instructions, CI config, or package scripts when present.
+3. Run the selected command and preserve the important output.
+   - Include the exact command.
+   - Capture failing test names, assertion messages, stack traces, and exit codes.
+4. Classify failures.
+   - Code bug: product behavior contradicts the expected behavior.
+   - Test bug: assertion, fixture, or test setup is wrong or outdated.
+   - Environment issue: missing dependency, service, credential, network, or platform assumption.
+5. Recommend the next action.
+   - If tests pass, mention any meaningful coverage gap or skipped validation.
+   - If tests fail, identify the first useful failure and the likely fix path.
+
+## Output
+
+Use this structure:
+
+```text
+Command:
+<exact command>
+
+Result:
+PASS | FAIL | PARTIAL | SKIPPED
+
+Findings:
+- <high-signal observation>
+
+Next step:
+- <specific recommendation>
+```
+
+Keep the response concise. Do not paste long logs; quote only the lines needed to diagnose the result.
 
 $ARGUMENTS

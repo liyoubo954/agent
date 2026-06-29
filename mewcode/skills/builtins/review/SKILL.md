@@ -1,6 +1,6 @@
 ---
 name: review
-description: 审查当前代码变更，识别正确性、安全性、性能和可维护性问题
+description: Perform a code review of current or recent repository changes. Use when the user asks for review, code review, inspect changes, find bugs, assess risk, check a PR-style diff, or evaluate whether a change is safe. Prioritizes correctness, security, regressions, data loss, performance, and missing tests over style comments.
 allowedTools:
   - Bash
   - ReadFile
@@ -10,44 +10,53 @@ mode: fork
 context: none
 ---
 
-# 任务
+# Code Review
 
-你需要审查当前代码变更，并优先发现会造成实际风险的问题。
+Review the diff as a senior engineer. Lead with concrete findings that could affect users, production behavior, data, security, or maintainability.
 
-## 步骤
+## Workflow
 
-1. 运行 `git diff` 查看未暂存变更。
-2. 运行 `git diff --staged` 查看已暂存变更。
-3. 如果两者都为空，运行 `git log -1 --format=%H` 获取最近一次提交，再运行 `git diff HEAD~1` 查看最近提交的变更。
-4. 逐文件审查变更，按以下维度分析：
-   - **逻辑正确性**：算法是否正确，边界条件、空值和异常路径是否覆盖。
-   - **安全性**：是否存在注入风险、敏感信息泄露、权限绕过或危险命令问题。
-   - **性能**：是否存在不必要循环、重复 IO、N+1 查询、内存风险或阻塞操作。
-   - **代码风格**：命名是否清晰，是否符合项目约定，是否存在重复代码。
-   - **可维护性**：抽象是否合理，依赖是否清晰，测试是否容易补充。
-5. 按严重程度报告问题：
-   - **Critical**：必须修复，存在明确正确性、安全性或数据损坏问题。
-   - **Warning**：建议修复，存在潜在风险或明显改进空间。
-   - **Info**：可选改进，属于代码质量或可读性建议。
+1. Identify the review target.
+   - Run `git diff` for unstaged changes.
+   - Run `git diff --staged` for staged changes.
+   - If both are empty, review the latest commit with `git diff HEAD~1..HEAD`.
+2. Build enough context.
+   - Read changed files around the modified lines.
+   - Search for callers, tests, config, migrations, and related interfaces.
+   - Prefer evidence from code paths over assumptions.
+3. Prioritize issues.
+   - Correctness bugs and regressions.
+   - Security and permission problems.
+   - Data loss, schema, migration, or compatibility risks.
+   - Performance problems with realistic scale impact.
+   - Missing or weak tests for risky behavior.
+4. Avoid low-value comments.
+   - Do not list generic style preferences.
+   - Do not praise unless it clarifies why no issue was found.
+   - Do not invent issues that are not supported by the diff or surrounding code.
 
-## 输出格式
+## Output
+
+Use this structure:
 
 ```text
-## 审查报告
+Findings:
+- [Severity] path:line - Issue and impact. Suggested fix.
 
-### Critical
-- [文件:行号] 问题描述及修复建议
+Open Questions:
+- <only if needed>
 
-### Warning
-- [文件:行号] 问题描述及修复建议
-
-### Info
-- [文件:行号] 改进建议
-
-### 正面反馈
-- 值得保留的设计或实现
+Test Gaps:
+- <missing validation or not run>
 ```
 
-如果没有发现问题，请明确说明没有发现阻塞性问题，并列出仍未验证的风险。
+Severity:
+
+- `Critical`: likely production breakage, data loss, security vulnerability, or unusable feature.
+- `High`: clear bug or regression in a common path.
+- `Medium`: plausible bug, edge-case breakage, or important missing validation.
+- `Low`: maintainability or test coverage concern with limited immediate impact.
+
+If no issues are found, say so clearly and mention the remaining verification limits.
 
 $ARGUMENTS

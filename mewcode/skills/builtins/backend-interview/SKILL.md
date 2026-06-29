@@ -1,6 +1,6 @@
 ---
 name: backend-interview
-description: 模拟后端技术面试，基于简历生成有针对性的面试问题
+description: Generate a targeted backend engineering interview from a candidate resume or profile. Use when the user asks to simulate a backend interview, create interview questions, evaluate a backend candidate, design resume-based technical questions, or prepare interviewer notes. Focuses on backend fundamentals, project deep dives, system design, tradeoffs, and risk signals.
 allowedTools:
   - ReadFile
   - Grep
@@ -10,57 +10,64 @@ mode: fork
 context: none
 ---
 
-# 任务
+# Backend Interview Designer
 
-你是一位资深后端技术面试官，需要基于候选人的简历设计一场有针对性的技术面试。
+Create a practical interview plan that tests the candidate's real experience, not a generic question bank.
 
-## 步骤
+## Workflow
 
-1. 优先调用 `parse_resume` 工具解析候选人简历，获取结构化信息，例如技术栈、项目经历、工作年限和职责范围。
-2. 如果用户没有指定简历文件路径，使用 `Glob` 搜索当前目录下的常见命名，例如 `resume.*`、`简历.*`、`*resume*`、`*cv*`。
-3. 根据解析结果生成三轮问题。
+1. Locate and parse the resume.
+   - If a path is provided, read or parse that file.
+   - If no path is provided, search for common names such as `resume.*`, `cv.*`, `简历.*`, `*resume*`, or `*cv*`.
+   - Prefer `parse_resume` when available; otherwise extract the key facts manually.
+2. Build a candidate profile.
+   - Years of experience.
+   - Primary languages and frameworks.
+   - Databases, middleware, infrastructure, and cloud exposure.
+   - Most substantial projects and the candidate's stated role.
+   - Claims that need verification, such as high concurrency, performance tuning, distributed systems, or ownership.
+3. Generate interview questions in three layers.
+   - Fundamentals: verify depth in the declared stack.
+   - Project deep dive: test actual ownership, decisions, tradeoffs, and failure handling.
+   - System design: match the candidate's level and domain experience.
+4. Provide evaluation guidance.
+   - Include what a strong answer should cover.
+   - Include follow-up probes for vague answers.
+   - Include risk signals that may indicate shallow experience.
 
-## 第一轮：基础知识
+## Output
 
-- 生成 3 到 4 个问题。
-- 根据简历中的技术栈出题。
-- 考察候选人对核心概念、边界条件和常见故障的理解。
-- 示例：如果简历写了 Redis，可以追问缓存穿透、击穿、雪崩的区别和应对方式。
-
-## 第二轮：项目深挖
-
-- 生成 2 到 3 个问题。
-- 挑选简历中最有含金量的项目。
-- 追问架构决策、性能瓶颈、故障处理、权衡取舍和个人贡献。
-- 示例：如果简历写了高并发系统，可以追问 QPS 量级、限流方案、降级策略和压测方法。
-
-## 第三轮：系统设计
-
-- 生成 1 个系统设计题。
-- 题目应与候选人的实际经验相关。
-- 要求候选人说明核心模块、数据流、存储设计、扩展性和容灾方案。
-
-## 输出格式
+Use this structure:
 
 ```text
-## 面试题目
+## Candidate Profile
+- Seniority signal:
+- Core stack:
+- Strongest project evidence:
+- Main risk signals:
 
-### 第一轮：基础知识
-1. [技术栈] 题目描述
-   参考答案要点：...
+## Interview Plan
 
-### 第二轮：项目深挖
-1. [项目名称] 题目描述
-   考察点：...
+### Round 1: Backend Fundamentals
+1. [Topic] Question
+   Strong answer:
+   Follow-up:
 
-### 第三轮：系统设计
-1. 题目描述
-   评估维度：...
+### Round 2: Project Deep Dive
+1. [Project] Question
+   What to listen for:
+   Risk signal:
 
-## 候选人画像
-- 技术栈匹配度：
-- 建议面试重点：
-- 潜在风险点：
+### Round 3: System Design
+1. Scenario
+   Evaluation dimensions:
+   Follow-up probes:
+
+## Interviewer Notes
+- Recommended focus:
+- Areas to verify:
 ```
+
+Do not overfit to buzzwords. Prefer questions that force the candidate to explain decisions, constraints, metrics, and incident handling.
 
 $ARGUMENTS
