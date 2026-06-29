@@ -107,8 +107,6 @@ class AgentLoader:
             if agent_def.agent_type not in seen:
                 seen[agent_def.agent_type] = agent_def
 
-        # 优先级 4：插件（保留，未实现）
-
         self._agents = seen
         return seen
 

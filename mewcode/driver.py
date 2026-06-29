@@ -11,7 +11,7 @@ else:
 
 class NoAltScreenDriver(_BaseDriver):
     """跳过备用屏（alternate screen）的 driver，让输出保留在主终端的
-    滚动回看（scrollback）区域中——与 Claude Code 的渲染行为保持一致。
+    滚动回看（scrollback）区域中。
     自动根据平台选择 LinuxDriver 或 WindowsDriver 作为基类。
 
     原理：去掉 alt screen 切换码，并在进入应用模式时输出足够多的空行，

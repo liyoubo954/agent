@@ -463,7 +463,6 @@ def verify_agent_tool():
     check("description 是 required", "description" in required)
     check("subagent_type 不是 required", "subagent_type" not in required)
 
-    # worktree 未实现
     params_wt = AgentToolParams(
         prompt="test", description="test", isolation="worktree"
     )

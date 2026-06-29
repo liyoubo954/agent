@@ -5,13 +5,12 @@ from mewcode.hooks.events import LifecycleEvent
 from mewcode.hooks.models import Action, Hook
 
 _VALID_EVENTS = {e.value for e in LifecycleEvent}
-_VALID_ACTION_TYPES = {"command", "prompt", "http", "agent"}
+_VALID_ACTION_TYPES = {"command", "prompt", "http"}
 
 _REQUIRED_FIELDS: dict[str, list[str]] = {
     "command": ["command"],
     "prompt": ["message"],
     "http": ["url"],
-    "agent": ["prompt"],
 }
 
 
@@ -114,4 +113,3 @@ def load_hooks(raw_hooks: list[dict] | None) -> list[Hook]:
         )
 
     return hooks
-

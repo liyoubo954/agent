@@ -281,16 +281,15 @@ class TestHttpExecutor:
             assert result.success is True
             assert "200" in result.output
 
-class TestAgentExecutor:
-    @pytest.mark.asyncio
-    async def test_stub(self):
-        from mewcode.hooks.executors import execute_agent
-
-        action = Action(type="agent", prompt="Check $FILE_PATH")
-        ctx = HookContext(file_path="test.py")
-        result = await execute_agent(action, ctx)
-        assert result.success is True
-        assert "not yet implemented" in result.output
+class TestUnsupportedAgentExecutor:
+    def test_agent_action_is_rejected_by_loader(self):
+        with pytest.raises(HookConfigError, match="invalid action type"):
+            load_hooks([
+                {
+                    "event": "post_tool_use",
+                    "action": {"type": "agent", "prompt": "Check $FILE_PATH"},
+                }
+            ])
 
 class TestExecuteAction:
     @pytest.mark.asyncio
@@ -375,9 +374,6 @@ class TestLoadHooks:
 
         with pytest.raises(HookConfigError, match="requires.*message"):
             load_hooks([{"event": "startup", "action": {"type": "prompt"}}])
-
-        with pytest.raises(HookConfigError, match="requires.*prompt"):
-            load_hooks([{"event": "startup", "action": {"type": "agent"}}])
 
 # ---------------------------------------------------------------------------
 # HookEngine

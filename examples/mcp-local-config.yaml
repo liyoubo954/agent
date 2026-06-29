@@ -1,16 +1,14 @@
-# Copy the mcp_servers block into .mewcode/config.yaml alongside your existing
-# providers. Do not replace provider settings or API keys.
-#
-# The command uses the current Conda environment Python and exposes only the
-# configured project root to the MCP tools.
+# Copy this block into .mewcode/config.yaml alongside your provider settings.
+# Replace <project-root> with the absolute path of the repository you want the
+# local MCP server to expose.
 
 mcp_servers:
   local:
-    command: D:\anconda\envs\MewCode\python.exe
+    command: python
     args:
       - -m
       - mewcode.mcp.local_server
       - --root
-      - E:\Agent_learning\mewcode-python
+      - <project-root>
     env:
-      MEWCODE_MCP_ROOT: E:\Agent_learning\mewcode-python
+      MEWCODE_MCP_ROOT: <project-root>

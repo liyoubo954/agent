@@ -33,8 +33,7 @@ SUMMARY_OUTPUT_RESERVE = 20_000
 AUTO_COMPACT_SAFETY_MARGIN = 13_000
 MANUAL_COMPACT_SAFETY_MARGIN = 3_000
 
-# Layer 2 "保留近期原文"窗口（对应 Claude Code compact.ts 的
-# buildPostCompactMessages messagesToKeep）。压缩时，尾部消息按 token 累计不超过
+# Layer 2 "保留近期原文"窗口。压缩时，尾部消息按 token 累计不超过
 # KEEP_RECENT_TOKENS、或消息数不少于 MIN_KEEP_MESSAGES（取先满足的条件保底）保留原文，
 # 不纳入摘要。累计超过 KEEP_MAX_TOKENS 时停止，防止单条超大消息吞掉整个窗口。
 KEEP_RECENT_TOKENS = 10_000

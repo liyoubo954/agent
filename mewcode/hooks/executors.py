@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 import os
 import shlex
 import sys
@@ -9,9 +8,6 @@ from urllib.request import Request, urlopen
 from urllib.error import URLError
 
 from mewcode.hooks.models import Action, ActionResult, HookContext
-
-log = logging.getLogger(__name__)
-
 
 async def _terminate_process(proc: asyncio.subprocess.Process) -> None:
     if proc.returncode is not None:
@@ -113,20 +109,10 @@ async def execute_http(action: Action, ctx: HookContext) -> ActionResult:
     return await loop.run_in_executor(None, _do_request)
 
 
-async def execute_agent(action: Action, ctx: HookContext) -> ActionResult:
-    prompt = ctx.expand(action.prompt)
-    log.info("Agent executor stub called with prompt: %s", prompt[:100])
-    return ActionResult(
-        output="agent executor not yet implemented",
-        success=True,
-    )
-
-
 _EXECUTOR_MAP = {
     "command": execute_command,
     "prompt": execute_prompt,
     "http": execute_http,
-    "agent": execute_agent,
 }
 
 

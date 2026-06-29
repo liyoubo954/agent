@@ -1,7 +1,3 @@
-# 来源：公众号@小林coding
-# 后端八股网站：xiaolincoding.com
-# Agent网站：xiaolinnote.com
-# 简历模版：jianli.xiaolinnote.com
 from __future__ import annotations
 
 import asyncio
@@ -321,6 +317,7 @@ class Agent:
         self.permission_mode: PermissionMode = (
             permission_checker.mode if permission_checker else PermissionMode.DEFAULT
         )
+        self._sync_tool_permission_mode()
         self.context_window = context_window
         self.session_dir = ensure_session_dir(work_dir)
         self.compact_breaker = CompactCircuitBreaker()
@@ -384,6 +381,13 @@ class Agent:
         self.permission_mode = mode
         if self.permission_checker:
             self.permission_checker.mode = mode
+        self._sync_tool_permission_mode()
+
+    def _sync_tool_permission_mode(self) -> None:
+        bypass_read_check = self.permission_mode == PermissionMode.BYPASS
+        for tool in self.registry.list_tools():
+            if tool.name in {"WriteFile", "EditFile"}:
+                setattr(tool, "_bypass_read_check", bypass_read_check)
 
     def activate_skill(self, name: str, prompt_body: str) -> None:
         self.active_skills[name] = prompt_body
