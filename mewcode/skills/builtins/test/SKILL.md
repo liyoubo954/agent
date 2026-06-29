@@ -1,6 +1,6 @@
 ---
 name: test
-description: Run and interpret a project's test suite. Use when the user asks to test, verify, validate, run checks, reproduce a failure, diagnose failing tests, or assess whether recent code changes are safe. Supports Python, Go, Node.js, Rust, and mixed repositories by detecting project files and selecting the most appropriate test command.
+description: 运行并分析项目测试。适用于用户要求测试、验证、跑检查、复现失败、诊断测试失败、确认近期代码改动是否安全等场景。会根据项目文件识别 Python、Go、Node.js、Rust 或混合仓库，并选择最合适的测试命令。
 allowedTools:
   - Bash
   - ReadFile
@@ -9,49 +9,47 @@ allowedTools:
 mode: inline
 ---
 
-# Test Runner
+# 测试执行
 
-Run the smallest reliable validation that answers the user's request, then explain the result with enough evidence for the user to act.
+运行能够回答用户问题的最小可靠验证，并用足够证据说明结果。
 
-## Workflow
+## 流程
 
-1. Identify the project type and test entrypoints.
-   - Python: `pyproject.toml`, `setup.py`, `pytest.ini`, `tox.ini`; prefer `python -m pytest`.
-   - Go: `go.mod`; prefer `go test ./...`.
-   - Node.js: `package.json`; inspect scripts and prefer the declared test script.
-   - Rust: `Cargo.toml`; prefer `cargo test`.
-   - Mixed repo: run only the relevant suite unless the user asks for full validation.
-2. Check existing instructions before inventing commands.
-   - Read README, project instructions, CI config, or package scripts when present.
-3. Run the selected command and preserve the important output.
-   - Include the exact command.
-   - Capture failing test names, assertion messages, stack traces, and exit codes.
-4. Classify failures.
-   - Code bug: product behavior contradicts the expected behavior.
-   - Test bug: assertion, fixture, or test setup is wrong or outdated.
-   - Environment issue: missing dependency, service, credential, network, or platform assumption.
-5. Recommend the next action.
-   - If tests pass, mention any meaningful coverage gap or skipped validation.
-   - If tests fail, identify the first useful failure and the likely fix path.
+1. 识别项目类型和测试入口。
+   - Python：查找 `pyproject.toml`、`setup.py`、`pytest.ini`、`tox.ini`，优先使用 `python -m pytest`。
+   - Go：查找 `go.mod`，优先使用 `go test ./...`。
+   - Node.js：查找 `package.json`，读取 scripts，优先使用项目声明的测试命令。
+   - Rust：查找 `Cargo.toml`，优先使用 `cargo test`。
+   - 混合仓库：除非用户要求完整验证，否则只运行和本次任务相关的测试。
+2. 先看项目已有说明，再决定命令。
+   - 优先读取 README、项目说明、CI 配置或包管理脚本。
+3. 执行测试命令并保留关键输出。
+   - 必须记录实际命令。
+   - 失败时捕获测试名、断言信息、关键堆栈和退出码。
+4. 判断失败类型。
+   - 代码问题：产品行为与期望行为不一致。
+   - 测试问题：断言、fixture 或测试配置本身错误或过期。
+   - 环境问题：依赖、服务、凭据、网络或平台条件缺失。
+5. 给出下一步。
+   - 测试通过时，说明是否仍有未覆盖的重要场景。
+   - 测试失败时，优先指出第一个最有诊断价值的失败和修复方向。
 
-## Output
-
-Use this structure:
+## 输出格式
 
 ```text
-Command:
-<exact command>
+命令：
+<实际执行的命令>
 
-Result:
+结果：
 PASS | FAIL | PARTIAL | SKIPPED
 
-Findings:
-- <high-signal observation>
+发现：
+- <高价值观察>
 
-Next step:
-- <specific recommendation>
+下一步：
+- <具体建议>
 ```
 
-Keep the response concise. Do not paste long logs; quote only the lines needed to diagnose the result.
+不要粘贴大段日志，只引用判断结果所需的关键行。
 
 $ARGUMENTS

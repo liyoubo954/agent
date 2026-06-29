@@ -1,6 +1,6 @@
 ---
 name: review
-description: Perform a code review of current or recent repository changes. Use when the user asks for review, code review, inspect changes, find bugs, assess risk, check a PR-style diff, or evaluate whether a change is safe. Prioritizes correctness, security, regressions, data loss, performance, and missing tests over style comments.
+description: 审查当前或最近的代码变更。适用于用户要求 review、代码审查、检查改动、找 bug、评估风险、审查 PR 风格 diff、判断改动是否安全等场景。优先关注正确性、安全性、回归风险、数据损坏、性能问题和缺失测试，而不是普通风格建议。
 allowedTools:
   - Bash
   - ReadFile
@@ -10,53 +10,49 @@ mode: fork
 context: none
 ---
 
-# Code Review
+# 代码审查
 
-Review the diff as a senior engineer. Lead with concrete findings that could affect users, production behavior, data, security, or maintainability.
+像资深工程师一样审查 diff，优先给出会影响用户、生产行为、数据、安全或可维护性的具体问题。
 
-## Workflow
+## 流程
 
-1. Identify the review target.
-   - Run `git diff` for unstaged changes.
-   - Run `git diff --staged` for staged changes.
-   - If both are empty, review the latest commit with `git diff HEAD~1..HEAD`.
-2. Build enough context.
-   - Read changed files around the modified lines.
-   - Search for callers, tests, config, migrations, and related interfaces.
-   - Prefer evidence from code paths over assumptions.
-3. Prioritize issues.
-   - Correctness bugs and regressions.
-   - Security and permission problems.
-   - Data loss, schema, migration, or compatibility risks.
-   - Performance problems with realistic scale impact.
-   - Missing or weak tests for risky behavior.
-4. Avoid low-value comments.
-   - Do not list generic style preferences.
-   - Do not praise unless it clarifies why no issue was found.
-   - Do not invent issues that are not supported by the diff or surrounding code.
+1. 确定审查对象。
+   - 使用 `git diff` 查看未暂存改动。
+   - 使用 `git diff --staged` 查看已暂存改动。
+   - 如果两者都为空，使用 `git diff HEAD~1..HEAD` 审查最近一次提交。
+2. 补足上下文。
+   - 阅读变更文件的相关上下文。
+   - 搜索调用方、测试、配置、迁移和相关接口。
+   - 基于代码路径和 diff 证据判断，不凭空猜测。
+3. 按风险优先级审查。
+   - 正确性 bug 和行为回归。
+   - 安全、权限和敏感信息问题。
+   - 数据丢失、schema、迁移或兼容性风险。
+   - 有现实规模影响的性能问题。
+   - 高风险逻辑缺少测试或测试力度不足。
+4. 避免低价值评论。
+   - 不输出泛泛的风格偏好。
+   - 不为了显得全面而虚构问题。
+   - 没有发现问题时，直接说明没有发现阻塞性问题。
 
-## Output
-
-Use this structure:
+## 输出格式
 
 ```text
-Findings:
-- [Severity] path:line - Issue and impact. Suggested fix.
+发现：
+- [Severity] path:line - 问题、影响和建议修复方式。
 
-Open Questions:
-- <only if needed>
+开放问题：
+- <只有确实需要时填写>
 
-Test Gaps:
-- <missing validation or not run>
+测试缺口：
+- <未运行或仍缺失的验证>
 ```
 
-Severity:
+严重程度：
 
-- `Critical`: likely production breakage, data loss, security vulnerability, or unusable feature.
-- `High`: clear bug or regression in a common path.
-- `Medium`: plausible bug, edge-case breakage, or important missing validation.
-- `Low`: maintainability or test coverage concern with limited immediate impact.
-
-If no issues are found, say so clearly and mention the remaining verification limits.
+- `Critical`：很可能导致生产故障、数据丢失、安全漏洞或核心功能不可用。
+- `High`：常见路径中的明确 bug 或回归。
+- `Medium`：可信的边界问题、异常路径问题或重要验证缺失。
+- `Low`：短期影响有限的可维护性或测试覆盖建议。
 
 $ARGUMENTS

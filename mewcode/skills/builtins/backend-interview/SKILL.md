@@ -1,6 +1,6 @@
 ---
 name: backend-interview
-description: Generate a targeted backend engineering interview from a candidate resume or profile. Use when the user asks to simulate a backend interview, create interview questions, evaluate a backend candidate, design resume-based technical questions, or prepare interviewer notes. Focuses on backend fundamentals, project deep dives, system design, tradeoffs, and risk signals.
+description: 基于候选人简历或背景生成有针对性的后端技术面试方案。适用于用户要求模拟后端面试、生成面试题、评估后端候选人、根据简历设计技术问题、准备面试官提纲等场景。重点覆盖后端基础、项目深挖、系统设计、技术取舍和风险信号。
 allowedTools:
   - ReadFile
   - Grep
@@ -10,64 +10,62 @@ mode: fork
 context: none
 ---
 
-# Backend Interview Designer
+# 后端面试设计
 
-Create a practical interview plan that tests the candidate's real experience, not a generic question bank.
+设计一套能验证候选人真实经验的面试方案，而不是生成通用题库。
 
-## Workflow
+## 流程
 
-1. Locate and parse the resume.
-   - If a path is provided, read or parse that file.
-   - If no path is provided, search for common names such as `resume.*`, `cv.*`, `简历.*`, `*resume*`, or `*cv*`.
-   - Prefer `parse_resume` when available; otherwise extract the key facts manually.
-2. Build a candidate profile.
-   - Years of experience.
-   - Primary languages and frameworks.
-   - Databases, middleware, infrastructure, and cloud exposure.
-   - Most substantial projects and the candidate's stated role.
-   - Claims that need verification, such as high concurrency, performance tuning, distributed systems, or ownership.
-3. Generate interview questions in three layers.
-   - Fundamentals: verify depth in the declared stack.
-   - Project deep dive: test actual ownership, decisions, tradeoffs, and failure handling.
-   - System design: match the candidate's level and domain experience.
-4. Provide evaluation guidance.
-   - Include what a strong answer should cover.
-   - Include follow-up probes for vague answers.
-   - Include risk signals that may indicate shallow experience.
+1. 定位并解析简历。
+   - 如果用户提供路径，读取或解析该文件。
+   - 如果没有提供路径，搜索 `resume.*`、`cv.*`、`简历.*`、`*resume*`、`*cv*` 等常见命名。
+   - 优先使用 `parse_resume`；不可用时手动提取关键事实。
+2. 建立候选人画像。
+   - 工作年限和职级信号。
+   - 主要语言、框架和工程栈。
+   - 数据库、中间件、基础设施和云服务经验。
+   - 最有分量的项目，以及候选人声称承担的职责。
+   - 需要重点核验的主张，例如高并发、性能优化、分布式系统、稳定性治理或独立负责。
+3. 生成三层面试问题。
+   - 基础知识：验证候选人对声明技术栈的掌握深度。
+   - 项目深挖：验证真实参与度、决策依据、技术取舍和故障处理。
+   - 系统设计：匹配候选人级别和领域经验。
+4. 给出评估指引。
+   - 标明强答案应覆盖的关键点。
+   - 给出追问方向，用于处理空泛回答。
+   - 标出可能代表经验不足或包装过度的风险信号。
 
-## Output
-
-Use this structure:
+## 输出格式
 
 ```text
-## Candidate Profile
-- Seniority signal:
-- Core stack:
-- Strongest project evidence:
-- Main risk signals:
+## 候选人画像
+- 职级信号：
+- 核心技术栈：
+- 最强项目证据：
+- 主要风险信号：
 
-## Interview Plan
+## 面试方案
 
-### Round 1: Backend Fundamentals
-1. [Topic] Question
-   Strong answer:
-   Follow-up:
+### 第一轮：后端基础
+1. [主题] 问题
+   强答案要点：
+   追问：
 
-### Round 2: Project Deep Dive
-1. [Project] Question
-   What to listen for:
-   Risk signal:
+### 第二轮：项目深挖
+1. [项目] 问题
+   观察重点：
+   风险信号：
 
-### Round 3: System Design
-1. Scenario
-   Evaluation dimensions:
-   Follow-up probes:
+### 第三轮：系统设计
+1. 场景
+   评估维度：
+   追问方向：
 
-## Interviewer Notes
-- Recommended focus:
-- Areas to verify:
+## 面试官备注
+- 建议重点：
+- 需要核验：
 ```
 
-Do not overfit to buzzwords. Prefer questions that force the candidate to explain decisions, constraints, metrics, and incident handling.
+不要只围绕 buzzword 出题。优先设计能迫使候选人解释约束、指标、决策、事故和取舍的问题。
 
 $ARGUMENTS
