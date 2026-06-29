@@ -7,6 +7,8 @@ import os
 import subprocess
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -18,6 +20,8 @@ from mewcode.worktree.manager import WorktreeError, WorktreeManager
 from mewcode.worktree.models import WorktreeSession
 from mewcode.worktree.session import load_worktree_session, save_worktree_session
 from mewcode.worktree.slug import flatten_slug, validate_slug
+from mewcode.tools.enter_worktree import EnterWorktreeParams, EnterWorktreeTool
+from mewcode.tools.exit_worktree import ExitWorktreeParams, ExitWorktreeTool
 
 # =========================================================================
 # A. Slug 校验
@@ -156,6 +160,45 @@ class TestWorktreeConfig:
 # =========================================================================
 # H. 会话持久化
 # =========================================================================
+
+class TestWorktreeToolCallbacks:
+    @pytest.mark.asyncio
+    async def test_enter_updates_agent_work_dir(self, tmp_path):
+        manager = MagicMock()
+        manager.get_current_session.return_value = None
+        manager.create = AsyncMock(return_value=SimpleNamespace(branch="feature"))
+        manager.enter = AsyncMock(return_value=SimpleNamespace(
+            worktree_path=str(tmp_path / "worktree"),
+        ))
+        on_enter = MagicMock()
+
+        result = await EnterWorktreeTool(manager, on_enter=on_enter).execute(
+            EnterWorktreeParams(name="feature")
+        )
+
+        assert not result.is_error
+        on_enter.assert_called_once_with(str(tmp_path / "worktree"))
+
+    @pytest.mark.asyncio
+    async def test_exit_restores_agent_work_dir(self, tmp_path):
+        original = str(tmp_path / "original")
+        manager = MagicMock()
+        manager.get_current_session.return_value = SimpleNamespace(
+            worktree_path=str(tmp_path / "worktree"),
+            original_cwd=original,
+            worktree_name="feature",
+            original_head_commit="abc",
+        )
+        manager.exit = AsyncMock()
+        on_exit = MagicMock()
+
+        result = await ExitWorktreeTool(manager, on_exit=on_exit).execute(
+            ExitWorktreeParams(action="keep")
+        )
+
+        assert not result.is_error
+        on_exit.assert_called_once_with(original)
+
 
 class TestSessionPersistence:
 

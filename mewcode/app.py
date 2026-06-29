@@ -787,15 +787,21 @@ class MewCodeApp(App):
         )
         restored = self.worktree_manager.restore_session()
         if restored:
-            self.agent.work_dir = restored.worktree_path
+            self.agent.set_work_dir(restored.worktree_path)
 
         wt_command = create_worktree_command(self.worktree_manager)
         self.command_registry.register_sync(wt_command)
 
         from mewcode.tools.enter_worktree import EnterWorktreeTool
         from mewcode.tools.exit_worktree import ExitWorktreeTool
-        self.registry.register(EnterWorktreeTool(worktree_manager=self.worktree_manager))
-        self.registry.register(ExitWorktreeTool(worktree_manager=self.worktree_manager))
+        self.registry.register(EnterWorktreeTool(
+            worktree_manager=self.worktree_manager,
+            on_enter=self.agent.set_work_dir,
+        ))
+        self.registry.register(ExitWorktreeTool(
+            worktree_manager=self.worktree_manager,
+            on_exit=self.agent.set_work_dir,
+        ))
 
         self._stale_cleanup_task = asyncio.create_task(
             start_stale_cleanup_task(

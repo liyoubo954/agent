@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from typing import TYPE_CHECKING, Any
 
 from mewcode.tools.base import Tool
@@ -121,6 +122,20 @@ class ToolRegistry:
 
     def list_tools(self) -> list[Tool]:
         return list(self._tools.values())
+
+    def copy_with_tools(self, tools: list[Tool]) -> ToolRegistry:
+        """Build an isolated registry while preserving shared dependencies."""
+        cloned = ToolRegistry()
+        for tool in tools:
+            cloned.register(copy.copy(tool))
+
+        cloned._disabled = self._disabled.intersection(cloned._tools)
+        cloned._discovered = self._discovered.intersection(cloned._tools)
+
+        tool_search = cloned.get("ToolSearch")
+        if tool_search is not None and hasattr(tool_search, "_registry"):
+            setattr(tool_search, "_registry", cloned)
+        return cloned
 
 
     def get_all_schemas(self, protocol: str = "anthropic") -> list[dict[str, Any]]:

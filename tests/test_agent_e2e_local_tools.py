@@ -69,3 +69,43 @@ async def test_local_agent_tool_roundtrip_uses_agent_work_dir(tmp_path):
     assert len(tool_outputs) == 4
     assert any("pkg\\main.py" in m["content"] or "pkg/main.py" in m["content"] for m in tool_outputs)
     assert any("STDOUT" in m["content"] and "ok" in m["content"] for m in tool_outputs)
+
+
+@pytest.mark.asyncio
+async def test_agent_binds_local_tools_to_its_work_dir(tmp_path):
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "pkg" / "main.py").write_text(
+        "def answer():\n    return 42\n",
+        encoding="utf-8",
+    )
+
+    client = ScriptedClient([
+        [
+            ToolCallComplete("glob-1", "Glob", {"pattern": "**/*.py", "path": "."}),
+            ToolCallComplete(
+                "read-1",
+                "ReadFile",
+                {"file_path": "pkg/main.py"},
+            ),
+            StreamEnd("end_turn", input_tokens=10, output_tokens=5),
+        ],
+        [
+            TextDelta("Done."),
+            StreamEnd("end_turn", input_tokens=20, output_tokens=5),
+        ],
+    ])
+
+    registry = create_default_registry()
+    agent = Agent(
+        client=client,
+        registry=registry,
+        protocol="openai-compat",
+        work_dir=str(tmp_path),
+    )
+    conv = ConversationManager()
+    await agent.run_to_completion("Inspect the project.", conv)
+
+    wire = build_chat_completion_messages(conv.get_messages())
+    tool_outputs = [m["content"] for m in wire if m.get("role") == "tool"]
+    assert any("Matched 1 item(s)" in output and "pkg" in output for output in tool_outputs)
+    assert any("return 42" in output for output in tool_outputs)

@@ -48,6 +48,7 @@ class AskUserTool(Tool):
     category: str = "read"
     is_system_tool = True
     should_defer = True
+    execution_timeout = 305.0
 
 
     def __init__(self) -> None:

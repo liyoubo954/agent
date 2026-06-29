@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import logging
 from typing import TYPE_CHECKING
 
@@ -26,20 +27,23 @@ def filter_tool_registry(
     if not allowed:
         return registry
 
-    filtered = ToolRegistry()
+    selected = []
     for name in allowed:
         tool = registry.get(name)
         if tool is None:
             raise SkillDependencyError(
                 f"Skill requires tool '{name}' but it is not registered"
             )
-        filtered.register(tool)
+        selected.append(tool)
 
     for tool in registry.list_tools():
-        if getattr(tool, "is_system_tool", False) and filtered.get(tool.name) is None:
-            filtered.register(tool)
+        if (
+            getattr(tool, "is_system_tool", False)
+            and all(selected_tool.name != tool.name for selected_tool in selected)
+        ):
+            selected.append(tool)
 
-    return filtered
+    return registry.copy_with_tools(selected)
 
 
 class SkillExecutor:
@@ -92,13 +96,34 @@ class SkillExecutor:
 
         from mewcode.agent import Agent as AgentClass, StreamText, LoopComplete, ErrorEvent
 
+        permission_checker = (
+            copy.copy(self.agent.permission_checker)
+            if self.agent.permission_checker is not None
+            else None
+        )
+        if permission_checker is None:
+            from mewcode.permissions import (
+                DangerousCommandDetector,
+                PathSandbox,
+                PermissionChecker,
+                PermissionMode,
+                RuleEngine,
+            )
+
+            permission_checker = PermissionChecker(
+                detector=DangerousCommandDetector(),
+                sandbox=PathSandbox(self.agent.work_dir),
+                rule_engine=RuleEngine(),
+                mode=PermissionMode.DEFAULT,
+            )
+
         fork_agent = AgentClass(
             client=self.client,
             registry=filtered_registry,
             protocol=self.protocol,
             work_dir=self.agent.work_dir,
             max_iterations=self.agent.max_iterations,
-            permission_checker=None,
+            permission_checker=permission_checker,
             context_window=self.agent.context_window,
         )
 
@@ -118,7 +143,8 @@ class SkillExecutor:
         if mode == "none":
             return []
 
-        history = self.agent._conversation.history if hasattr(self.agent, '_conversation') else []
+        conversation = getattr(self.agent, "_current_conversation", None)
+        history = conversation.history if conversation is not None else []
         if not history:
             main_history = []
         else:

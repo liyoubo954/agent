@@ -346,6 +346,57 @@ class TestFilterToolRegistry:
         with pytest.raises(SkillDependencyError, match="NoSuchTool"):
             filter_tool_registry(registry, ["NoSuchTool"])
 
+
+class TestSkillExecutor:
+    def test_recent_context_uses_active_agent_conversation(self) -> None:
+        from mewcode.conversation import ConversationManager
+
+        agent = MagicMock()
+        agent._current_conversation = ConversationManager()
+        agent._current_conversation.add_user_message("first")
+        agent._current_conversation.add_assistant_message("second")
+        executor = SkillExecutor(agent=agent, client=MagicMock(), protocol="anthropic")
+
+        messages = executor._build_fork_context("recent")
+
+        assert [message.content for message in messages] == ["first", "second"]
+
+    @pytest.mark.asyncio
+    async def test_fork_inherits_parent_permission_checker(self) -> None:
+        from mewcode.agent import LoopComplete
+
+        async def completed_run(_conversation):
+            yield LoopComplete(total_turns=1)
+
+        parent = MagicMock()
+        parent.registry = ToolRegistry()
+        parent.permission_checker = MagicMock()
+        parent.work_dir = "."
+        parent.max_iterations = 10
+        parent.context_window = 1000
+        parent._current_conversation = MagicMock()
+        executor = SkillExecutor(
+            agent=parent,
+            client=MagicMock(),
+            protocol="anthropic",
+        )
+        skill = SkillDef(
+            name="safe-fork",
+            description="safe",
+            prompt_body="inspect",
+            mode="fork",
+            context="none",
+        )
+
+        with patch("mewcode.agent.Agent") as agent_class:
+            agent_class.return_value.run.side_effect = completed_run
+            await executor.execute_fork(skill, "")
+
+        checker = agent_class.call_args.kwargs["permission_checker"]
+        assert checker is not None
+        assert checker is not parent.permission_checker
+        assert checker.mode == parent.permission_checker.mode
+
 # ---------------------------------------------------------------------------
 # 目录型 Skill：tool.json 解析
 # ---------------------------------------------------------------------------

@@ -117,12 +117,9 @@ def resolve_agent_tools(
             if name in allowed_set
         }
 
-    filtered = ToolRegistry()
-    for tool in mcp_tools.values():
-        filtered.register(tool)
-    for tool in all_tools.values():
-        filtered.register(tool)
-    return filtered
+    return parent_registry.copy_with_tools(
+        [*mcp_tools.values(), *all_tools.values()]
+    )
 
 
 def build_teammate_tools(
@@ -174,9 +171,7 @@ def build_teammate_tools(
         SendMessageTool(team_manager, team_name, agent_id, agent_name),
     ]
 
-    registry = ToolRegistry()
-    for tool in filtered.values():
-        registry.register(tool)
+    registry = parent_registry.copy_with_tools(list(filtered.values()))
     for tool in coordination_tools:
         registry.register(tool)
 
@@ -185,8 +180,8 @@ def build_teammate_tools(
 
 def apply_coordinator_filter(registry: ToolRegistry) -> ToolRegistry:
     all_tools = {t.name: t for t in registry.list_tools()}
-    filtered = ToolRegistry()
-    for name, tool in all_tools.items():
-        if name in COORDINATOR_MODE_ALLOWED_TOOLS:
-            filtered.register(tool)
-    return filtered
+    return registry.copy_with_tools([
+        tool
+        for name, tool in all_tools.items()
+        if name in COORDINATOR_MODE_ALLOWED_TOOLS
+    ])

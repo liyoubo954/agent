@@ -20,7 +20,7 @@ from mewcode.agent import (
     partition_tool_calls,
 )
 from mewcode.prompts import build_environment_context, build_plan_mode_reminder, build_system_prompt
-from mewcode.client import LLMClient
+from mewcode.client import LLMClient, NetworkError
 from mewcode.conversation import ConversationManager
 from mewcode.serialization import build_anthropic_messages
 from mewcode.tools import create_default_registry
@@ -28,7 +28,9 @@ from mewcode.tools.base import (
     StreamEnd,
     StreamEvent,
     TextDelta,
+    Tool,
     ToolCallComplete,
+    ToolResult,
 )
 
 # ---------------------------------------------------------------------------
@@ -207,6 +209,80 @@ async def test_stop_max_iterations():
     c = _collect(events)
     assert len(c["error"]) == 1
     assert "maximum iterations" in c["error"][0].message
+
+
+@pytest.mark.asyncio
+async def test_tool_execution_uses_shared_timeout_boundary():
+    from pydantic import BaseModel
+    from mewcode.tools import ToolRegistry
+
+    class Params(BaseModel):
+        pass
+
+    class SlowTool(Tool):
+        name = "SlowTool"
+        description = "Never finishes in time"
+        params_model = Params
+        execution_timeout = 0.01
+
+        async def execute(self, params: BaseModel) -> ToolResult:
+            await asyncio.sleep(1)
+            return ToolResult(output="late")
+
+    client = MockLLMClient([
+        [
+            ToolCallComplete("slow-1", "SlowTool", {}),
+            StreamEnd("end_turn", input_tokens=1, output_tokens=1),
+        ],
+        [
+            TextDelta("Recovered."),
+            StreamEnd("end_turn", input_tokens=1, output_tokens=1),
+        ],
+    ])
+    registry = ToolRegistry()
+    registry.register(SlowTool())
+    agent = Agent(client, registry, "anthropic")
+    conv = ConversationManager()
+    conv.add_user_message("Run the slow tool")
+
+    events = []
+    async for event in agent.run(conv):
+        events.append(event)
+
+    result = _collect(events)["tool_result"][0]
+    assert result.is_error
+    assert "timed out" in result.output
+
+
+@pytest.mark.asyncio
+async def test_transient_llm_failure_retries_before_streaming():
+    class FlakyClient(LLMClient):
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def stream(
+            self,
+            conversation: ConversationManager,
+            system: str = "",
+            tools: list[dict[str, Any]] | None = None,
+        ) -> AsyncIterator[StreamEvent]:
+            self.calls += 1
+            if self.calls == 1:
+                raise NetworkError("temporary")
+            yield TextDelta("Recovered")
+            yield StreamEnd("end_turn")
+
+    client = FlakyClient()
+    agent = Agent(client, create_default_registry(), "anthropic")
+    conv = ConversationManager()
+    conv.add_user_message("hello")
+
+    events = []
+    async for event in agent.run(conv):
+        events.append(event)
+
+    assert client.calls == 2
+    assert "".join(event.text for event in events if isinstance(event, StreamText)) == "Recovered"
 
 @pytest.mark.asyncio
 async def test_stop_cancel():

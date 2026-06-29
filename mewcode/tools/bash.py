@@ -27,6 +27,10 @@ class Bash(Tool):
     def set_work_dir(self, work_dir: str) -> None:
         self.cwd = work_dir
 
+    def get_execution_timeout(self, params: BaseModel) -> float:
+        assert isinstance(params, Params)
+        return float(min(params.timeout, MAX_TIMEOUT) + 5)
+
     async def execute(self, params: Params) -> ToolResult:
         timeout = min(params.timeout, MAX_TIMEOUT)
         cwd = str(Path(self.cwd).resolve()) if self.cwd else None

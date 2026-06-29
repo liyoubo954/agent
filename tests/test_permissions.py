@@ -329,6 +329,27 @@ class TestPermissionChecker:
         d = self.checker.check(tool, {"file_path": str(self.tmpdir / "x.txt"), "content": "hi"})
         assert d.effect == "deny"
 
+    def test_plan_mode_only_allows_exact_plan_file_inside_sandbox(self) -> None:
+        from mewcode.tools.write_file import WriteFile
+
+        plan_file = self.tmpdir / ".mewcode" / "plans" / "plan.md"
+        outside_same_name = self.tmpdir.parent / "plan.md"
+        self.checker.mode = PermissionMode.PLAN
+        self.checker.plan_file_path = str(plan_file)
+        tool = WriteFile()
+
+        exact = self.checker.check(
+            tool,
+            {"file_path": str(plan_file), "content": "safe"},
+        )
+        outside = self.checker.check(
+            tool,
+            {"file_path": str(outside_same_name), "content": "unsafe"},
+        )
+
+        assert exact.effect == "allow"
+        assert outside.effect == "deny"
+
     def test_bypass_mode_allows_all(self) -> None:
         from mewcode.tools.bash import Bash
         self.checker.mode = PermissionMode.BYPASS

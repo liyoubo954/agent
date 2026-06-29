@@ -11,7 +11,7 @@ from typing import Any, AsyncIterator, Callable
 
 from pydantic import ValidationError
 
-from mewcode.client import LLMClient
+from mewcode.client import LLMClient, NetworkError, RateLimitError
 from mewcode.context import (
     CompactCircuitBreaker,
     CompactEvent,
@@ -27,6 +27,7 @@ from mewcode.conversation import ConversationManager, ToolResultBlock, ToolUseBl
 from mewcode.conversation import ThinkingBlock as ConvThinkingBlock
 from mewcode.memory.auto_memory import MemoryManager
 from mewcode.permissions import (
+    PathSandbox,
     PermissionChecker,
     PermissionMode,
 )
@@ -51,6 +52,8 @@ log = logging.getLogger(__name__)
 MEMORY_EXTRACTION_INTERVAL = 5
 MAX_TOKENS_CEILING = 64000
 MAX_OUTPUT_TOKENS_RECOVERIES = 3
+MAX_TRANSIENT_LLM_RETRIES = 2
+LLM_RETRY_BASE_DELAY = 0.25
 
 
 # ---------------------------------------------------------------------------
@@ -312,6 +315,7 @@ class Agent:
         self.provider_name = provider_name
         self.model = model
         self.work_dir = work_dir
+        self.registry.set_work_dir(work_dir)
         self.max_iterations = max_iterations
         self.permission_checker = permission_checker
         self.permission_mode: PermissionMode = (
@@ -382,6 +386,12 @@ class Agent:
         if self.permission_checker:
             self.permission_checker.mode = mode
         self._sync_tool_permission_mode()
+
+    def set_work_dir(self, work_dir: str) -> None:
+        self.work_dir = work_dir
+        self.registry.set_work_dir(work_dir)
+        if self.permission_checker is not None:
+            self.permission_checker.sandbox = PathSandbox(work_dir)
 
     def _sync_tool_permission_mode(self) -> None:
         bypass_read_check = self.permission_mode == PermissionMode.BYPASS
@@ -459,6 +469,16 @@ class Agent:
                     message=f"Agent reached maximum iterations ({self.max_iterations})"
                 )
                 break
+
+            refreshed_env = build_environment_context(
+                self.work_dir,
+                self.active_skills,
+                self._skill_catalog,
+                self._agent_catalog,
+            )
+            if refreshed_env != env_context:
+                env_context = refreshed_env
+                conversation.update_environment(env_context)
 
             if self.hook_engine:
                 ctx = self._build_hook_context("turn_start")
@@ -553,7 +573,11 @@ class Agent:
                 append_replacement_records(self.session_dir, _new_records)
 
             collector = StreamCollector()
-            llm_stream = self.client.stream(api_conv, system=system, tools=tools)
+            llm_stream = self._stream_llm_with_retries(
+                api_conv,
+                system=system,
+                tools=tools,
+            )
             async for event in collector.consume(llm_stream):
                 yield event
 
@@ -835,13 +859,7 @@ class Agent:
                 is_unknown=False,
             )
 
-        try:
-            params = tool.params_model.model_validate(tc.arguments)
-            result = await tool.execute(params)
-        except ValidationError as e:
-            result = ToolResult(output=f"Parameter validation error: {e}", is_error=True)
-        except Exception as e:
-            result = ToolResult(output=f"Tool execution error: {e}", is_error=True)
+        result = await self._invoke_tool(tool, tc.arguments)
 
         self._snapshot_for_recovery(tc, result)
 
@@ -926,22 +944,72 @@ class Agent:
                     rule = Rule(tool_name=tc.tool_name, pattern=pattern, effect="allow")
                     self.permission_checker.rule_engine.append_local_rule(rule)
 
-        try:
-            params = tool.params_model.model_validate(tc.arguments)
-            result = await tool.execute(params)
-        except ValidationError as e:
-            result = ToolResult(
-                output=f"Parameter validation error: {e}", is_error=True
-            )
-        except Exception as e:
-            result = ToolResult(
-                output=f"Tool execution error: {e}", is_error=True
-            )
+        result = await self._invoke_tool(tool, tc.arguments)
 
         self._snapshot_for_recovery(tc, result)
 
         elapsed = time.monotonic() - start
         yield result, elapsed, is_unknown
+
+    async def _invoke_tool(
+        self,
+        tool: Any,
+        arguments: dict[str, Any],
+    ) -> ToolResult:
+        """Validate and execute every tool through one timeout/error boundary."""
+        try:
+            params = tool.params_model.model_validate(arguments)
+            timeout = tool.get_execution_timeout(params)
+            if timeout is None:
+                return await tool.execute(params)
+            timeout_seconds = max(float(timeout), 0.001)
+            return await asyncio.wait_for(
+                tool.execute(params),
+                timeout=timeout_seconds,
+            )
+        except ValidationError as e:
+            return ToolResult(
+                output=f"Parameter validation error: {e}", is_error=True
+            )
+        except asyncio.TimeoutError:
+            return ToolResult(
+                output=f"Tool execution timed out: {tool.name}", is_error=True
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            return ToolResult(
+                output=f"Tool execution error: {e}", is_error=True
+            )
+
+    async def _stream_llm_with_retries(
+        self,
+        conversation: ConversationManager,
+        system: str,
+        tools: list[dict[str, Any]],
+    ) -> AsyncIterator[StreamEvent]:
+        """Retry transient failures only before a response starts streaming."""
+        for attempt in range(MAX_TRANSIENT_LLM_RETRIES + 1):
+            emitted = False
+            try:
+                async for event in self.client.stream(
+                    conversation,
+                    system=system,
+                    tools=tools,
+                ):
+                    emitted = True
+                    yield event
+                return
+            except (NetworkError, RateLimitError) as exc:
+                if emitted or attempt >= MAX_TRANSIENT_LLM_RETRIES:
+                    raise
+                retry_after = getattr(exc, "retry_after", None)
+                delay = (
+                    float(retry_after)
+                    if retry_after is not None
+                    else LLM_RETRY_BASE_DELAY * (2 ** attempt)
+                )
+                await asyncio.sleep(min(max(delay, 0.0), 5.0))
 
     def _snapshot_for_recovery(
         self, tc: ToolCallComplete, result: ToolResult
@@ -952,15 +1020,18 @@ class Agent:
         """
         if result.is_error or tc.tool_name != "ReadFile":
             return
-        path = tc.arguments.get("file_path") if isinstance(tc.arguments, dict) else None
-        if not path:
+        raw_path = tc.arguments.get("file_path") if isinstance(tc.arguments, dict) else None
+        if not raw_path:
             return
+        path = Path(raw_path)
+        if not path.is_absolute():
+            path = Path(self.work_dir) / path
         try:
             with open(path, "r", encoding="utf-8", errors="replace") as fh:
                 content = fh.read()
         except OSError:
             return
-        self.recovery_state.record_file_read(path, content)
+        self.recovery_state.record_file_read(str(path), content)
 
     async def _extract_memories(
         self, conversation: ConversationManager
@@ -1016,34 +1087,24 @@ class Agent:
         self, task: str, conversation: ConversationManager | None = None,
         event_callback: Callable[[dict[str, Any]], None] | None = None,
     ) -> str:
+        env_context = build_environment_context(
+            self.work_dir,
+            self.active_skills,
+            self._skill_catalog,
+            self._agent_catalog,
+        )
         if conversation is None:
             conversation = ConversationManager()
-
-            env_context = build_environment_context(
-                self.work_dir, self.active_skills, self._skill_catalog, self._agent_catalog
-            )
-            conversation.inject_environment(env_context)
 
             if self.instructions_content:
                 memory_content = self.memory_manager.load() if self.memory_manager else ""
                 conversation.inject_long_term_memory(
                     self.instructions_content, memory_content
                 )
+        conversation.update_environment(env_context)
 
         if task:
             conversation.add_user_message(task)
-
-        hook_prompts = (
-            self.hook_engine.get_prompt_messages() if self.hook_engine else None
-        )
-        system = build_system_prompt(
-            hook_prompts=hook_prompts,
-            coordinator_mode=self.coordinator_mode,
-            work_dir=self.work_dir,
-            provider_name=self.provider_name,
-            provider_protocol=self.protocol,
-            model=self.model,
-        )
 
         tools = self.registry.get_all_schemas(self.protocol)
 
@@ -1058,6 +1119,28 @@ class Agent:
         last_text = ""
 
         for iteration in range(1, self.max_iterations + 1):
+            refreshed_env = build_environment_context(
+                self.work_dir,
+                self.active_skills,
+                self._skill_catalog,
+                self._agent_catalog,
+            )
+            if refreshed_env != env_context:
+                env_context = refreshed_env
+                conversation.update_environment(env_context)
+
+            hook_prompts = (
+                self.hook_engine.get_prompt_messages() if self.hook_engine else None
+            )
+            system = build_system_prompt(
+                hook_prompts=hook_prompts,
+                coordinator_mode=self.coordinator_mode,
+                work_dir=self.work_dir,
+                provider_name=self.provider_name,
+                provider_protocol=self.protocol,
+                model=self.model,
+            )
+
             if self.hook_engine:
                 ctx = self._build_hook_context("turn_start")
                 await self.hook_engine.run_hooks("turn_start", ctx)
@@ -1090,6 +1173,8 @@ class Agent:
                     + "\n".join(deferred_names)
                 )
 
+            tools = self.registry.get_all_schemas(self.protocol)
+
             api_conv, _new_records = apply_tool_result_budget(
                 conversation, self.session_dir, self.replacement_state
             )
@@ -1097,7 +1182,11 @@ class Agent:
                 append_replacement_records(self.session_dir, _new_records)
 
             collector = StreamCollector()
-            llm_stream = self.client.stream(api_conv, system=system, tools=tools)
+            llm_stream = self._stream_llm_with_retries(
+                api_conv,
+                system=system,
+                tools=tools,
+            )
             async for _event in collector.consume(llm_stream):
                 pass
 
@@ -1226,17 +1315,7 @@ class Agent:
                         is_error=True,
                     )
 
-        try:
-            params = tool.params_model.model_validate(tc.arguments)
-            result = await tool.execute(params)
-        except ValidationError as e:
-            result = ToolResult(
-                output=f"Parameter validation error: {e}", is_error=True
-            )
-        except Exception as e:
-            result = ToolResult(
-                output=f"Tool execution error: {e}", is_error=True
-            )
+        result = await self._invoke_tool(tool, tc.arguments)
 
         if self.hook_engine:
             file_path = self._infer_file_path(tc.arguments)

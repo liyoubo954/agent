@@ -147,6 +147,12 @@ class ConversationManager:
             self.history.insert(0, Message(role="user", content=context))
             self.env_injected = True
 
+    def update_environment(self, context: str) -> None:
+        if self.env_injected and self.history:
+            self.history[0] = Message(role="user", content=context)
+            return
+        self.inject_environment(context)
+
     def inject_long_term_memory(
         self, instructions: str, memories: str
     ) -> None:

@@ -40,6 +40,7 @@ class Tool(ABC):
     is_concurrency_safe: bool = False
     is_system_tool: bool = False
     should_defer: bool = False
+    execution_timeout: float | None = 120.0
 
     @property
     def is_read_only(self) -> bool:
@@ -54,6 +55,9 @@ class Tool(ABC):
             "description": self.description,
             "input_schema": schema,
         }
+
+    def get_execution_timeout(self, params: BaseModel) -> float | None:
+        return self.execution_timeout
 
     @abstractmethod
     async def execute(self, params: BaseModel) -> ToolResult: ...

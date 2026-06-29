@@ -68,6 +68,7 @@ class AgentTool(Tool):
     params_model = AgentToolParams
     category = "command"
     is_concurrency_safe = False
+    execution_timeout = None
 
 
     def __init__(

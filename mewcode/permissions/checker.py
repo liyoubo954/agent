@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from mewcode.permissions.dangerous import DangerousCommandDetector, is_safe_command
@@ -45,6 +46,12 @@ class PermissionChecker:
                 return Decision(effect="allow", reason="Plan mode: allowed tool")
             if tool.name in ("WriteFile", "EditFile") and content:
                 if self._is_plan_file(content):
+                    ok, reason = self.sandbox.check(content)
+                    if not ok:
+                        return Decision(
+                            effect="deny",
+                            reason=f"路径沙箱拦截: {reason}",
+                        )
                     return Decision(effect="allow", reason="Plan mode: plan file write")
 
         # Layer 1: 安全的只读命令（自动放行）
@@ -83,14 +90,16 @@ class PermissionChecker:
 
     def _is_plan_file(self, target_path: str) -> bool:
         if not self.plan_file_path or not target_path:
-            return ".mewcode/plans/" in target_path
+            return False
         try:
-            abs_target = os.path.abspath(target_path)
-            abs_plan = os.path.abspath(self.plan_file_path)
-            if abs_target == abs_plan:
-                return True
-        except Exception:
-            pass
-        if os.path.basename(target_path) == os.path.basename(self.plan_file_path):
-            return True
-        return ".mewcode/plans/" in target_path
+            target = Path(target_path).expanduser()
+            if not target.is_absolute():
+                target = self.sandbox.project_root / target
+            plan = Path(self.plan_file_path).expanduser()
+            if not plan.is_absolute():
+                plan = self.sandbox.project_root / plan
+            return os.path.normcase(str(target.resolve(strict=False))) == os.path.normcase(
+                str(plan.resolve(strict=False))
+            )
+        except (OSError, RuntimeError, ValueError):
+            return False

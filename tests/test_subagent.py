@@ -26,7 +26,7 @@ from mewcode.agents.trace import TraceManager, TraceNode
 from mewcode.agents.task_manager import BackgroundTask, TaskManager
 from mewcode.agents.notification import format_task_notification, inject_task_notifications
 from mewcode.conversation import ConversationManager, Message, ToolResultBlock, ToolUseBlock
-from mewcode.tools import ToolRegistry
+from mewcode.tools import ToolRegistry, create_default_registry
 from mewcode.tools.base import Tool, ToolResult
 
 # =====================================================================
@@ -270,6 +270,23 @@ class TestAgentLoader:
 # =====================================================================
 
 class TestToolFilter:
+
+    def test_filtered_registry_has_independent_tool_work_dir(self, tmp_path):
+        parent_dir = tmp_path / "parent"
+        child_dir = tmp_path / "child"
+        parent_dir.mkdir()
+        child_dir.mkdir()
+        reg = create_default_registry(work_dir=str(parent_dir))
+        definition = AgentDef(
+            agent_type="test", when_to_use="test", source="builtin"
+        )
+
+        filtered = resolve_agent_tools(reg, definition)
+        filtered.set_work_dir(str(child_dir))
+
+        assert reg.get("Bash").cwd == str(parent_dir)
+        assert filtered.get("Bash").cwd == str(child_dir)
+        assert reg.get("ReadFile") is not filtered.get("ReadFile")
 
     def test_global_disallowed(self):
         reg = make_registry("ReadFile", "Agent", "Bash", "AskUserQuestion")

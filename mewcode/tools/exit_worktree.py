@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Callable, Optional
 
 from pydantic import BaseModel, Field
 
@@ -36,8 +36,13 @@ class ExitWorktreeTool(Tool):
     should_defer = True
 
 
-    def __init__(self, worktree_manager: WorktreeManager) -> None:
+    def __init__(
+        self,
+        worktree_manager: WorktreeManager,
+        on_exit: Callable[[str], None] | None = None,
+    ) -> None:
         self._manager = worktree_manager
+        self._on_exit = on_exit
 
 
     async def execute(self, params: ExitWorktreeParams) -> ToolResult:
@@ -95,6 +100,9 @@ class ExitWorktreeTool(Tool):
             return ToolResult(
                 output=f"Error exiting worktree: {e}", is_error=True
             )
+
+        if self._on_exit is not None:
+            self._on_exit(original_cwd)
 
         if action == "keep":
             return ToolResult(

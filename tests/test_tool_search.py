@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Any, AsyncIterator
 
 import pytest
 from pydantic import BaseModel
@@ -10,6 +11,10 @@ from pydantic import BaseModel
 from mewcode.tools import ToolRegistry
 from mewcode.tools.base import Tool, ToolResult
 from mewcode.tools.impl.tool_search import ToolSearchTool
+from mewcode.agent import Agent
+from mewcode.client import LLMClient
+from mewcode.conversation import ConversationManager
+from mewcode.tools.base import StreamEnd, StreamEvent, TextDelta, ToolCallComplete
 
 # ---------------------------------------------------------------------------
 # 辅助工具
@@ -314,3 +319,39 @@ def test_deferred_end_to_end_discovery():
     deferred2 = reg.get_deferred_tool_names()
     assert "DeferredAlpha" not in deferred2
     assert "DeferredBeta" in deferred2
+
+
+@pytest.mark.asyncio
+async def test_noninteractive_agent_refreshes_schema_after_tool_search():
+    class RecordingClient(LLMClient):
+        def __init__(self) -> None:
+            self.tool_names: list[set[str]] = []
+            self.call_count = 0
+
+        async def stream(
+            self,
+            conversation: ConversationManager,
+            system: str = "",
+            tools: list[dict[str, Any]] | None = None,
+        ) -> AsyncIterator[StreamEvent]:
+            self.tool_names.append({tool["name"] for tool in tools or []})
+            self.call_count += 1
+            if self.call_count == 1:
+                yield ToolCallComplete(
+                    "search-1",
+                    "ToolSearch",
+                    {"query": "select:DeferredAlpha"},
+                )
+            else:
+                yield TextDelta("done")
+            yield StreamEnd("end_turn")
+
+    registry = _make_registry()
+    registry.register(ToolSearchTool(registry))
+    client = RecordingClient()
+    agent = Agent(client, registry, "anthropic")
+
+    await agent.run_to_completion("load the deferred tool")
+
+    assert "DeferredAlpha" not in client.tool_names[0]
+    assert "DeferredAlpha" in client.tool_names[1]
